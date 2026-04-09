@@ -54,9 +54,9 @@ def format_message(source_name, emoji, entry):
     title = entry.get("title", "No title").strip()
     link = entry.get("link", "").strip()
 
-    return {
-        "content": f"{emoji} **{source_name}**\n\n**{title}**\n\n🔗 {link}"
-    }
+   return {
+    "content": f"**{title}**\n\n🔗 {link}"
+}
 
 
 def post_to_discord(payload):
