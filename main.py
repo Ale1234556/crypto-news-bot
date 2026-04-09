@@ -11,12 +11,10 @@ FEEDS = [
     {
         "name": "Bitcoin Magazine",
         "url": "https://bitcoinmagazine.com/.rss/full/",
-        "emoji": "🟠",
     },
     {
         "name": "CoinDesk",
         "url": "https://www.coindesk.com/arc/outboundfeeds/rss/?outputType=xml",
-        "emoji": "🌍",
     },
 ]
 
@@ -50,13 +48,13 @@ def make_id(entry):
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def format_message(source_name, emoji, entry):
+def format_message(entry):
     title = entry.get("title", "No title").strip()
     link = entry.get("link", "").strip()
 
-   return {
-    "content": f"**{title}**\n\n🔗 {link}"
-}
+    return {
+        "content": f"**{title}**\n\n🔗 {link}"
+    }
 
 
 def post_to_discord(payload):
@@ -65,7 +63,10 @@ def post_to_discord(payload):
 
 
 def fetch_feed(feed):
-    parsed = feedparser.parse(feed["url"])
+    parsed = feedparser.parse(
+        feed["url"],
+        request_headers={"User-Agent": "Mozilla/5.0"}
+    )
     if getattr(parsed, "bozo", 0):
         print(f"[WARN] Feed issue: {feed['name']} | bozo={parsed.bozo}")
     return parsed.entries
@@ -89,7 +90,6 @@ def main():
             print(f"[ERROR] Failed reading {feed['name']}: {e}")
             continue
 
-        # publicar solo las más recientes primero
         entries = list(entries[:5])
         entries.reverse()
 
@@ -100,12 +100,14 @@ def main():
                 continue
 
             try:
-                payload = format_message(feed["name"], feed["emoji"], entry)
+                payload = format_message(entry)
                 post_to_discord(payload)
-                print(f"[SENT] {feed['name']} - {entry.get('title', 'No title')}")
+
+                print(f"[SENT] {entry.get('title', 'No title')}")
                 seen_set.add(article_id)
                 new_seen.append(article_id)
                 total_sent += 1
+
             except Exception as e:
                 print(f"[ERROR] Failed posting article: {e}")
 
