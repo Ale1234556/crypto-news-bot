@@ -17,8 +17,8 @@ FEEDS = [
         "url": "https://www.criptonoticias.com/feed/",
     },
     {
-        "name": "Investing Indices",
-        "url": "https://es.investing.com/rss/stock_Indices.rss",
+        "name": "FXStreet",
+        "url": "https://www.fxstreet.es/rss",
     },
 ]
 
