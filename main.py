@@ -1,6 +1,4 @@
 import os
-import json
-import hashlib
 import requests
 import feedparser
 from datetime import datetime, timezone
@@ -22,42 +20,16 @@ FEEDS = [
     },
 ]
 
-SEEN_FILE = "seen_articles.json"
-MAX_SEEN = 500
 
-
-def load_seen():
-    if not os.path.exists(SEEN_FILE):
-        return []
-
-    try:
-        with open(SEEN_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f)
-            return data if isinstance(data, list) else []
-    except Exception:
-        return []
-
-
-def save_seen(seen):
-    seen = seen[-MAX_SEEN:]
-
-    with open(SEEN_FILE, "w", encoding="utf-8") as f:
-        json.dump(seen, f, ensure_ascii=False, indent=2)
-
-
-def make_id(entry):
-    raw = (
-        entry.get("id")
-        or entry.get("link")
-        or (entry.get("title", "") + entry.get("published", ""))
-    )
-
-    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
-
-
-def format_message(entry):
+def format_message(feed_name, entry):
     title = entry.get("title", "No title").strip()
     link = entry.get("link", "").strip()
+    summary = entry.get("summary", "").strip()
+
+    if summary:
+        return {
+            "content": f"**{title}**\n\n{summary}\n\n🔗 {link}"
+        }
 
     return {
         "content": f"**{title}**\n\n🔗 {link}"
@@ -70,26 +42,30 @@ def post_to_discord(payload):
         json=payload,
         timeout=20
     )
-
     response.raise_for_status()
 
 
 def fetch_feed(feed):
-    parsed = feedparser.parse(
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/rss+xml, application/xml, text/xml, */*",
+    }
+
+    response = requests.get(
         feed["url"],
-        request_headers={
-            "User-Agent": "Mozilla/5.0"
-        }
+        headers=headers,
+        timeout=20,
+        allow_redirects=True
     )
 
-    entries_count = len(parsed.entries)
-    print(f"[DEBUG] {feed['name']} entries found: {entries_count}")
+    print(f"[DEBUG] {feed['name']} HTTP status: {response.status_code}")
+    print(f"[DEBUG] {feed['name']} content-type: {response.headers.get('Content-Type')}")
 
-    if entries_count > 0:
-        first_title = parsed.entries[0].get("title", "No title")
-        first_link = parsed.entries[0].get("link", "No link")
-        print(f"[DEBUG] {feed['name']} first title: {first_title}")
-        print(f"[DEBUG] {feed['name']} first link: {first_link}")
+    response.raise_for_status()
+
+    parsed = feedparser.parse(response.content)
+
+    print(f"[DEBUG] {feed['name']} entries found: {len(parsed.entries)}")
 
     if getattr(parsed, "bozo", 0):
         print(f"[WARN] Feed issue: {feed['name']} | bozo={parsed.bozo}")
@@ -100,71 +76,36 @@ def fetch_feed(feed):
 
 def main():
     if not DISCORD_WEBHOOK:
-        raise ValueError(
-            "Missing DISCORD_WEBHOOK environment variable"
-        )
-
-    seen = load_seen()
-    seen_set = set(seen)
-    new_seen = list(seen)
+        raise ValueError("Missing DISCORD_WEBHOOK environment variable")
 
     total_sent = 0
 
     for feed in FEEDS:
-
         print(f"[INFO] Checking {feed['name']}...")
 
         try:
             entries = fetch_feed(feed)
-
         except Exception as e:
-            print(
-                f"[ERROR] Failed reading "
-                f"{feed['name']}: {e}"
-            )
+            print(f"[ERROR] Failed reading {feed['name']}: {e}")
             continue
 
-        entries = list(entries[:5])
-        entries.reverse()
+        if not entries:
+            print(f"[WARN] No entries found for {feed['name']}")
+            continue
 
-        sent_for_feed = 0
+        latest_entry = entries[0]
 
-        for entry in entries:
+        try:
+            payload = format_message(feed["name"], latest_entry)
+            post_to_discord(payload)
 
-            article_id = make_id(entry)
+            print(f"[SENT] {feed['name']} - {latest_entry.get('title', 'No title')}")
+            total_sent += 1
 
-            if article_id in seen_set:
-                continue
+        except Exception as e:
+            print(f"[ERROR] Failed posting latest article from {feed['name']}: {e}")
 
-            try:
-                payload = format_message(entry)
-
-                post_to_discord(payload)
-
-                print(
-                    f"[SENT] "
-                    f"{entry.get('title', 'No title')}"
-                )
-
-                seen_set.add(article_id)
-                new_seen.append(article_id)
-
-                total_sent += 1
-                sent_for_feed += 1
-
-            except Exception as e:
-                print(
-                    f"[ERROR] Failed posting article: {e}"
-                )
-
-        print(f"[DEBUG] {feed['name']} sent this run: {sent_for_feed}")
-
-    save_seen(new_seen)
-
-    print(
-        f"[DONE] Sent {total_sent} new articles at "
-        f"{datetime.now(timezone.utc).isoformat()}"
-    )
+    print(f"[DONE] Sent {total_sent} test articles at {datetime.now(timezone.utc).isoformat()}")
 
 
 if __name__ == "__main__":
