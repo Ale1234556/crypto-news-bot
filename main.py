@@ -82,11 +82,18 @@ def fetch_feed(feed):
         }
     )
 
+    entries_count = len(parsed.entries)
+    print(f"[DEBUG] {feed['name']} entries found: {entries_count}")
+
+    if entries_count > 0:
+        first_title = parsed.entries[0].get("title", "No title")
+        first_link = parsed.entries[0].get("link", "No link")
+        print(f"[DEBUG] {feed['name']} first title: {first_title}")
+        print(f"[DEBUG] {feed['name']} first link: {first_link}")
+
     if getattr(parsed, "bozo", 0):
-        print(
-            f"[WARN] Feed issue: "
-            f"{feed['name']} | bozo={parsed.bozo}"
-        )
+        print(f"[WARN] Feed issue: {feed['name']} | bozo={parsed.bozo}")
+        print(f"[WARN] Feed exception: {getattr(parsed, 'bozo_exception', 'No exception')}")
 
     return parsed.entries
 
@@ -120,6 +127,8 @@ def main():
         entries = list(entries[:5])
         entries.reverse()
 
+        sent_for_feed = 0
+
         for entry in entries:
 
             article_id = make_id(entry)
@@ -141,11 +150,14 @@ def main():
                 new_seen.append(article_id)
 
                 total_sent += 1
+                sent_for_feed += 1
 
             except Exception as e:
                 print(
                     f"[ERROR] Failed posting article: {e}"
                 )
+
+        print(f"[DEBUG] {feed['name']} sent this run: {sent_for_feed}")
 
     save_seen(new_seen)
 
