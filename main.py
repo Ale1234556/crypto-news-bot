@@ -1,4 +1,6 @@
 import os
+import re
+from html import unescape
 import requests
 import feedparser
 from datetime import datetime, timezone
@@ -21,17 +23,36 @@ FEEDS = [
 ]
 
 
+def clean_html(text):
+    if not text:
+        return ""
+
+    text = re.sub(r"<[^>]+>", "", text)
+    text = unescape(text)
+    text = " ".join(text.split())
+
+    return text
+
+
 def format_message(entry):
     title = entry.get("title", "No title").strip()
     link = entry.get("link", "").strip()
-    summary = entry.get("summary", "").strip()
 
-    if len(summary) > 280:
-        summary = summary[:277] + "..."
+    summary = (
+        entry.get("summary")
+        or entry.get("description")
+        or ""
+    )
+
+    summary = clean_html(summary)
+
+    if len(summary) > 300:
+        summary = summary[:297] + "..."
 
     embed = {
         "title": title,
         "url": link,
+        "color": 0xF7931A,
     }
 
     if summary:
@@ -46,11 +67,12 @@ def format_message(entry):
         image_url = entry.media_thumbnail[0].get("url")
 
     if image_url:
-        embed["image"] = {"url": image_url}
+        embed["image"] = {
+            "url": image_url
+        }
 
     return {
-        "content": "",
-        "embeds": [embed],
+        "embeds": [embed]
     }
 
 
@@ -74,7 +96,10 @@ def fetch_feed(feed):
     print(f"[DEBUG] {feed['name']} entries found: {len(parsed.entries)}")
 
     if getattr(parsed, "bozo", 0):
-        print(f"[WARN] Feed issue: {feed['name']} | bozo={parsed.bozo}")
+        print(
+            f"[WARN] Feed issue: "
+            f"{feed['name']} | bozo={parsed.bozo}"
+        )
 
     return parsed.entries
 
@@ -86,12 +111,17 @@ def main():
     total_sent = 0
 
     for feed in FEEDS:
+
         print(f"[INFO] Checking {feed['name']}...")
 
         try:
             entries = fetch_feed(feed)
+
         except Exception as e:
-            print(f"[ERROR] Failed reading {feed['name']}: {e}")
+            print(
+                f"[ERROR] Failed reading "
+                f"{feed['name']}: {e}"
+            )
             continue
 
         if not entries:
@@ -102,15 +132,27 @@ def main():
 
         try:
             payload = format_message(latest_entry)
+
             post_to_discord(payload)
 
-            print(f"[SENT] {feed['name']} - {latest_entry.get('title', 'No title')}")
+            print(
+                f"[SENT] "
+                f"{feed['name']} - "
+                f"{latest_entry.get('title', 'No title')}"
+            )
+
             total_sent += 1
 
         except Exception as e:
-            print(f"[ERROR] Failed posting {feed['name']}: {e}")
+            print(
+                f"[ERROR] Failed posting "
+                f"{feed['name']}: {e}"
+            )
 
-    print(f"[DONE] Sent {total_sent} test articles at {datetime.now(timezone.utc).isoformat()}")
+    print(
+        f"[DONE] Sent {total_sent} test articles at "
+        f"{datetime.now(timezone.utc).isoformat()}"
+    )
 
 
 if __name__ == "__main__":
