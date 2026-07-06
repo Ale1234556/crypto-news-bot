@@ -14,10 +14,12 @@ FEEDS = [
     {
         "name": "DiarioBitcoin",
         "url": "https://www.diariobitcoin.com/feed/",
+        "color": 0xF7931A,
     },
     {
         "name": "Yahoo Finance S&P 500",
         "url": "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EGSPC&region=US&lang=es-ES",
+        "color": 0x005BBB,
     },
 ]
 
@@ -65,7 +67,7 @@ def make_id(entry):
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def format_message(entry):
+def format_message(entry, color):
     title = entry.get("title", "No title").strip()
     link = entry.get("link", "").strip()
 
@@ -83,7 +85,7 @@ def format_message(entry):
     embed = {
         "title": title,
         "url": link,
-        "color": 0xF7931A,
+        "color": color,
     }
 
     if summary:
@@ -171,7 +173,10 @@ def main():
                 continue
 
             try:
-                payload = format_message(entry)
+                payload = format_message(
+                    entry,
+                    feed["color"]
+                )
 
                 post_to_discord(payload)
 
