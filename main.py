@@ -13,12 +13,12 @@ FEEDS = [
         "url": "https://www.diariobitcoin.com/feed/",
     },
     {
-        "name": "CriptoNoticias",
-        "url": "https://www.criptonoticias.com/feed/",
+        "name": "Yahoo Finance S&P 500",
+        "url": "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EGSPC&region=US&lang=es-ES",
     },
     {
-        "name": "FXStreet",
-        "url": "https://www.fxstreet.es/rss",
+        "name": "Yahoo Finance Dow Jones",
+        "url": "https://feeds.finance.yahoo.com/rss/2.0/headline?s=%5EDJI&region=US&lang=es-ES",
     },
 ]
 
