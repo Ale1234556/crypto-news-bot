@@ -21,10 +21,43 @@ FEEDS = [
 ]
 
 
-def post_to_discord(link):
+def format_message(entry):
+    title = entry.get("title", "No title").strip()
+    link = entry.get("link", "").strip()
+    summary = entry.get("summary", "").strip()
+
+    if len(summary) > 280:
+        summary = summary[:277] + "..."
+
+    embed = {
+        "title": title,
+        "url": link,
+    }
+
+    if summary:
+        embed["description"] = summary
+
+    image_url = None
+
+    if "media_content" in entry and entry.media_content:
+        image_url = entry.media_content[0].get("url")
+
+    if not image_url and "media_thumbnail" in entry and entry.media_thumbnail:
+        image_url = entry.media_thumbnail[0].get("url")
+
+    if image_url:
+        embed["image"] = {"url": image_url}
+
+    return {
+        "content": "",
+        "embeds": [embed],
+    }
+
+
+def post_to_discord(payload):
     response = requests.post(
         DISCORD_WEBHOOK,
-        json={"content": link},
+        json=payload,
         timeout=20
     )
     response.raise_for_status()
@@ -66,16 +99,14 @@ def main():
             continue
 
         latest_entry = entries[0]
-        link = latest_entry.get("link", "").strip()
-
-        if not link:
-            print(f"[WARN] No link found for {feed['name']}")
-            continue
 
         try:
-            post_to_discord(link)
+            payload = format_message(latest_entry)
+            post_to_discord(payload)
+
             print(f"[SENT] {feed['name']} - {latest_entry.get('title', 'No title')}")
             total_sent += 1
+
         except Exception as e:
             print(f"[ERROR] Failed posting {feed['name']}: {e}")
 
